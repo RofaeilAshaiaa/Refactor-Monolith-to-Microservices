@@ -19,14 +19,14 @@ import {V0_FEED_MODELS, V0_USER_MODELS} from './controllers/v0/model.index';
 
   app.use(bodyParser.json());
 
-  app.use(cors({
+   app.use(cors({
     allowedHeaders: [
       'Origin', 'X-Requested-With',
       'Content-Type', 'Accept',
       'X-Access-Token', 'Authorization',
     ],
     methods: 'GET,HEAD,OPTIONS,PUT,PATCH,POST,DELETE',
-    origin: config.url,
+    origin: '*',
   }));
 
   app.use('/api/v0/', IndexRouter);

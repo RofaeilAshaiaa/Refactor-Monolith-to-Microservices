@@ -2,7 +2,7 @@
 # DO NOT STORE YOUR CREDENTIALS INTO GIT
 export POSTGRES_USERNAME=postgres
 export POSTGRES_PASSWORD=password
-export POSTGRES_HOST=192.168.1.100
+export POSTGRES_HOST=localhost
 export POSTGRES_DB=udagram-postgres
 export AWS_BUCKET=udagram-monolith-to-microservices
 export AWS_REGION=us-east-1

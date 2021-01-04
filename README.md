@@ -374,7 +374,7 @@ events {
 http {
     server {
         listen 8080;
-        location /api/ {
+        location / {
             proxy_pass http://udagram-backend:8181/;
         }
     }

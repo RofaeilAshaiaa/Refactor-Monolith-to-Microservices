@@ -17,7 +17,6 @@
     * [Creating the containers using docker files](#creating-the-containers-using-docker-files)
     * [Containers Orchestration using Docker Compose](#containers-orchestration-using-docker-compose)
     * [Running the services and the containers using docker compose](#running-the-services-and-the-containers-using-docker-compose)
-    * [](#)
 * [Tips](#tips)
 
 <!--te-->

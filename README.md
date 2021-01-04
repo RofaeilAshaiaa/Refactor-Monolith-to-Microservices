@@ -481,8 +481,8 @@ http {
 2. Run the following command to validate and view the Compose file  `docker-compose config`.
 3. Then run the command `docker-compose build` to build or rebuild the services specified in the Compose file.
 4. After that, run the command `docker-compose up` to create and start containers that are specified in the Compose file
-5. Open `http://localhost:8181/api/v0/feed`, `http://localhost:8080/api/`  and `http://localhost:8100` in your web
-   browser to verify that the applications, and the services are running.
+5. Open `http://localhost:8080/`, `http://localhost:8080/api/v0/feed/` and `http://localhost:8100` in your web browser
+   to verify that the applications, and the services are running.
 6. After testing the app and using it you can execute `docker-compose stop` to stop the running services and containers
    or you can execute `docker-compose down` to Stop and remove containers, networks, images, and volumes
 

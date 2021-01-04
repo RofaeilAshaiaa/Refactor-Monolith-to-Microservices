@@ -44,9 +44,6 @@ services:
     # setting the container name to avoid the default generated container name so that we can
     # reference the container with their names as hosts form our codebase or from another containers
     container_name: udagram-backend
-    # Enable port mapping from the container to the host so we can access the backend on that port
-    ports:
-      - "${BACKEND_PORT}:${BACKEND_PORT}"
     # we pass the environment variables defined in .env file without specifying the values
     # and they will be passed as the same named variables and with the same values they have
     environment:

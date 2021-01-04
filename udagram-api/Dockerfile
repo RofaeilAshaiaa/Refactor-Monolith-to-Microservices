@@ -1,7 +1,7 @@
 # we use a prebuilt NodeJS image as our base image and defines this container
 # as the first stage for using that in a multi stage build (make sure you specify
 # the same version to avoid any breaking changes that may come in later versions)
-FROM node:13 AS first_stage
+FROM node:13-alpine AS first_stage
 # Define the Working directory for any later commands
 WORKDIR /usr/src/app
 # copy the source files to the app directory

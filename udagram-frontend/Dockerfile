@@ -1,6 +1,6 @@
 # we use a prebuilt Node image as our base image (make sure you specify
 # the same version to avoid any breaking changes that may come in later versions)
-FROM node:13
+FROM node:13-alpine
 # Create the app directory
 WORKDIR /usr/src/app
 # Install app dependencies by copying package.json

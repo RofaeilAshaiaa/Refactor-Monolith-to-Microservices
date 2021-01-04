@@ -1,0 +1,83 @@
+version: "3.8"
+
+services:
+
+  udagram-postgres:
+    # we use prebuilt image as our base image (make sure you specify the same
+    # version to avoid any breaking changes that may come in later versions)
+    image: postgres:13.1
+    # setting the container name to avoid the default generated container name so that we can
+    # reference the container with their names as hosts form our codebase or from another containers
+    container_name: udagram-postgres
+    # we pass the environment variables defined in .env file without specifying the values
+    # and they will be passed as the same named variables and with the same values they have
+    environment:
+      - POSTGRES_USERNAME
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+    # Enable port mapping from the container to the host so we can access the database on that port
+    ports:
+      - "5432:5432"
+    # Add a named mount volume to persist the database data after container restarted or stopped.
+    # Also, we need to make sure that the volume mount point is `/var/lib/postgresql/data`
+    # because it's where the postgres store its data
+    volumes:
+      - database-data:/var/lib/postgresql/data
+
+  udagram-frontend:
+    build:
+      context: ./udagram-frontend/
+    # setting the container name to avoid the default generated container name so that we can
+    # reference the container with their names as hosts form our codebase or from another containers
+    container_name: udagram-frontend
+    # Enable port mapping from the container to the host so we can access the frontend on that port
+    ports:
+      - "${FRONTEND_PORT}:${FRONTEND_PORT}"
+    # we pass the environment variables defined in .env file without specifying the values
+    # and they will be passed as the same named variables and with the same values they have
+    environment:
+      - FRONTEND_PORT
+
+  udagram-backend:
+    build:
+      context: ./udagram-api/
+    # setting the container name to avoid the default generated container name so that we can
+    # reference the container with their names as hosts form our codebase or from another containers
+    container_name: udagram-backend
+    # Enable port mapping from the container to the host so we can access the backend on that port
+    ports:
+      - "${BACKEND_PORT}:${BACKEND_PORT}"
+    # we pass the environment variables defined in .env file without specifying the values
+    # and they will be passed as the same named variables and with the same values they have
+    environment:
+      - POSTGRES_USERNAME
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+      - POSTGRES_HOST
+      - AWS_BUCKET
+      - AWS_REGION
+      - AWS_PROFILE
+      - JWT_SECRET
+      - URL
+      - BACKEND_PORT
+    # we bind the .aws/credentials directory as a mounted bind volume in order for the backend
+    # API node app to work properly with AWS S3 (and other services later)
+    volumes:
+      - $HOME/.aws/credentials:/root/.aws/credentials:ro
+
+  udagram-reverse-proxy:
+    build:
+      context: ./reverse-proxy/
+    # setting the container name to avoid the default generated container name so that we can
+    # reference the container with their names as hosts form our codebase or from another containers
+    container_name: udagram-reverse-proxy
+    # Enable port mapping from the container to the host so we can access the backend on that port
+    ports:
+      - "${NGINX_PROXY_PORT}:${NGINX_PROXY_PORT}"
+    # we pass the environment variables defined in .env file without specifying the values
+    # and they will be passed as the same named variables and with the same values they have
+    environment:
+      - NGINX_PROXY_PORT
+
+volumes:
+  database-data:

@@ -38,33 +38,6 @@ services:
     environment:
       - FRONTEND_PORT
 
-  backend:
-    build:
-      context: ./udagram-api/
-    # setting the container name to avoid the default generated container name so that we can
-    # reference the container with their names as hosts form our codebase or from another containers
-    container_name: backend
-    # Enable port mapping from the container to the host so we can access the frontend on that port
-    ports:
-      - "${BACKEND_PORT}:${BACKEND_PORT}"
-    # we pass the environment variables defined in .env file without specifying the values
-    # and they will be passed as the same named variables and with the same values they have
-    environment:
-      - POSTGRES_USERNAME
-      - POSTGRES_PASSWORD
-      - POSTGRES_DB
-      - POSTGRES_HOST
-      - AWS_BUCKET
-      - AWS_REGION
-      - AWS_PROFILE
-      - JWT_SECRET
-      - URL
-      - BACKEND_PORT
-    # we bind the .aws/credentials directory as a mounted bind volume in order for the backend
-    # API node app to work properly with AWS S3 (and other services later)
-    volumes:
-      - $HOME/.aws/credentials:/root/.aws/credentials:ro
-
   users-microservice:
     build:
       context: ./udagram-api/users-microservice
@@ -113,7 +86,7 @@ services:
     # we bind the .aws/credentials directory as a mounted bind volume in order for the backend
     # API node app to work properly with AWS S3 (and other services later)
     volumes:
-      - $HOME/.aws/credentials:/root/.aws/credentials:ro
+      - $HOME/.aws/credentials:/root/.aws/credentials
 
   reverse-proxy:
     build:

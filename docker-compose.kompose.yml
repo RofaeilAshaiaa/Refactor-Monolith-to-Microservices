@@ -1,0 +1,87 @@
+# new version of docker-compose file to work correctly with Kompose CLI conversion tool
+version: "3"
+
+services:
+
+  postgres:
+    # we use prebuilt image as our base image (make sure you specify the same
+    # version to avoid any breaking changes that may come in later versions)
+    image: postgres:13.1
+    # setting the container name to avoid the default generated container name so that we can
+    # reference the container with their names as hosts form our codebase or from another containers
+    container_name: postgres
+    # Expose ports without publishing them to the host machine
+    expose:
+      - "5432"
+    # we pass the environment variables with their values
+    environment:
+      - POSTGRES_USERNAME=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=udagram-postgres
+
+  frontend:
+    # specify image tag as latest to always pull the latest image that we pushed to docker hub
+    image: rofaeilashaiaa/udagram-frontend:latest
+    # setting the container name to avoid the default generated container name so that we can
+    # reference the container with their names as hosts form our codebase or from another containers
+    container_name: frontend
+    # Expose ports without publishing them to the host machine
+    expose:
+      - "8100"
+    # we pass the environment variables with their values
+    environment:
+      - FRONTEND_PORT=8100
+
+  users-microservice:
+    # specify image tag as latest to always pull the latest image that we pushed to docker hub
+    image: rofaeilashaiaa/udagram-users-microservice:latest
+    # setting the container name to avoid the default generated container name so that we can
+    # reference the container with their names as hosts form our codebase or from another containers
+    container_name: users-microservice
+    # Expose ports without publishing them to the host machine
+    expose:
+      - "8181"
+    # we pass the environment variables with their values
+    environment:
+      - POSTGRES_USERNAME=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=udagram-postgres
+      - POSTGRES_HOST=postgres
+      - AWS_BUCKET=udagram-monolith-to-microservices
+      - AWS_REGION=us-east-1
+      - JWT_SECRET=anysecret
+      - BACKEND_PORT=8181
+
+  feed-microservice:
+    # specify image tag as latest to always pull the latest image that we pushed to docker hub
+    image: rofaeilashaiaa/udagram-feed-microservice:latest
+    # setting the container name to avoid the default generated container name so that we can
+    # reference the container with their names as hosts form our codebase or from another containers
+    container_name: feed-microservice
+    # we pass the environment variables with their values
+    # Expose ports without publishing them to the host machine
+    expose:
+      - "8181"
+    environment:
+      - POSTGRES_USERNAME=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=udagram-postgres
+      - POSTGRES_HOST=postgres
+      - AWS_BUCKET=udagram-monolith-to-microservices
+      - AWS_REGION=us-east-1
+      - JWT_SECRET=anysecret
+      - BACKEND_PORT=8181
+      - ENV_TYPE=developmentx
+
+  reverse-proxy:
+    # specify image tag as latest to always pull the latest image that we pushed to docker hub
+    image: rofaeilashaiaa/udagram-reverse-proxy:latest
+    # setting the container name to avoid the default generated container name so that we can
+    # reference the container with their names as hosts form our codebase or from another containers
+    container_name: reverse-proxy
+    # Enable port mapping from the container to the host so we can access the backend on that port
+    ports:
+      - "8080"
+    # we pass the environment variables with their values
+    environment:
+      - NGINX_PROXY_PORT=8080

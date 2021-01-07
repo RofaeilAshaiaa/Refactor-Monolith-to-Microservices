@@ -17,7 +17,13 @@
     * [Creating the containers using docker files](#creating-the-containers-using-docker-files)
     * [Containers Orchestration using Docker Compose](#containers-orchestration-using-docker-compose)
     * [Running the services and the containers using docker compose](#running-the-services-and-the-containers-using-docker-compose)
-* [Tips](#tips)
+* [Deployment using Kubernetes and MiniKube (local deployment)](#deployment-using-kubernetes-and-minikube-local-deployment)
+    * [Creating Kubernetes deployment and services files using Kompose](#creating-kubernetes-deployment-and-services-files-using-kompose)
+    * [Starting and Using MiniKube](#starting-and-using-minikube)
+    * [Deploying the cluster (pods, containers and services) using Kubernetes CLI (kubectl)](#deploying-the-cluster-pods-containers-and-services-using-kubernetes-cli-kubectl)
+    * [Run and access the deployed services locally (frontend website and backend api)](#run-and-access-the-deployed-services-locally-frontend-website-and-backend-api)
+    * [Creating another replica for one of the microservices](#creating-another-replica-for-one-of-the-microservices)
+    * [Configure scaling and self-healing for each service with CPU metrics](#configure-scaling-and-self-healing-for-each-service-with-cpu-metrics)
 
 <!--te-->
 
@@ -51,7 +57,8 @@ application, it should look the same regardless of whether the application is st
    can have two separate projects that can be run independent of one another.
 
    > _tip_:  Using Git is recommended, so you can revert any unwanted changes in your code!
-   > You may find yourself copying a lot of duplicate code into the separate projects -- this is expected! For now, focus on breaking apart the monolith and we can focus on cleaning up the application code afterwards.
+   > You may find yourself copying a lot of duplicate code into the separate projects -- this is expected! For now,
+   > focus on breaking apart the monolith, and we can focus on cleaning up the application code afterwards.
 
 2. **Containerize the Code**
 
@@ -177,8 +184,11 @@ application, it should look the same regardless of whether the application is st
 
 4. Create a PostgreSQL database either locally or on AWS RDS. Set the config values for environment variables prefixed
    with `POSTGRES_` in `set_env.sh`.
-   > _tip_: if you don't want to install postgres locally you can use docker to create and run postgres container instance using the following command
-   > `docker run --rm --name udagram-postgres-test -p 5432:5432 -e POSTGRES_PASSWORD -e POSTGRES_DB -e POSTGRES_USERNAME -d postgres`, after that you can check your database connection by connecting to the container or with any GUI tool like Postbird for more details on settings up postgres on a docker, check out [this tutorial](https://www.optimadata.nl/blogs/1/n8dyr5-how-to-run-postgres-on-docker-part-1)
+   > _tip_: if you don't want to install postgres locally you can use docker to create and run postgres container
+   > instance using the following command `docker run --rm --name udagram-postgres-test -p 5432:5432 -e POSTGRES_PASSWORD
+   > -e POSTGRES_DB -e POSTGRES_USERNAME -d postgres`, after that you can check your database connection by connecting
+   > to the container or with any GUI tool like Postbird for more details on settings up postgres on a docker,
+   > check out [this tutorial](https://www.optimadata.nl/blogs/1/n8dyr5-how-to-run-postgres-on-docker-part-1)
 
 ### Backend Setup
 
@@ -369,13 +379,31 @@ CMD ["nginx", "-g", "daemon off;"]
 The second file is the nginx.conf file with following content
 
 ```nginx configuration
-events {
-}
+worker_processes 1;
+
+events { worker_connections 1024; }
+error_log /dev/stdout debug;
 http {
+    sendfile on;
+    upstream user {
+        server users-microservice:8181;
+    }
+    upstream feed {
+        server feed-microservice:8181;
+    }
+
+    proxy_set_header   Host $host;
+    proxy_set_header   X-Real-IP $remote_addr;
+    proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header   X-Forwarded-Host $server_name;
+
     server {
         listen 8080;
-        location / {
-            proxy_pass http://udagram-backend:8181/;
+        location /api/v0/feed {
+            proxy_pass         http://feed;
+        }
+        location /api/v0/users {
+            proxy_pass         http://user;
         }
     }
 }
@@ -486,28 +514,289 @@ http {
 6. After testing the app and using it you can execute `docker-compose stop` to stop the running services and containers
    or you can execute `docker-compose down` to Stop and remove containers, networks, images, and volumes
 
-### Tips
+## Deployment using Kubernetes and MiniKube (local deployment)
 
-1. Take a look at `udagram-api` -- does it look like we can divide it into two modules to be deployed as separate
-   microservices?
-2. The `.dockerignore` file is included for your convenience to not copy `node_modules`. Copying this over into a Docker
-   container might cause issues if your local environment is a different operating system than the Docker image (ex.
-   Windows or MacOS vs. Linux).
-3. It's useful to "lint" your code so that changes in the codebase adhere to a coding standard. This helps alleviate
-   issues when developers use different styles of coding. `eslint` has been set up for TypeScript in the codebase for
-   you. To lint your code, run the following:
-    ```bash
-    npx eslint --ext .js,.ts src/
+### Prerequisites for using Kubernetes and MiniKube:
+
+- You need to install [Docker](https://docker.com) engine, and the Docker CLI in order to be able to run containers
+  using `Dockerfile.yml` file and execute commands such as `docker container`, `docker image create`, `docker run` etc.
+  You can follow the instructions for your specific operating system from the official docker
+  documentation [here](https://docs.docker.com/engine/install/)
+
+- You need to install The [Kubernetes](https://kubernetes.io) command-line tool, kubectl, which allows you to run
+  commands against Kubernetes clusters. You can follow the instructions for your specific operating system from the
+  official kubernetes documentation [here](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
+
+- You need to install [MiniKube](https://minikube.sigs.k8s.io), which is local Kubernetes, focusing on making it easy to
+  learn and develop for Kubernetes. You can follow the instructions for your specific operating system from the official
+  MiniKube documentation [here](https://minikube.sigs.k8s.io/docs/start/)
+
+- You need to install [Kompose](https://kompose.io), Kompose is a conversion tool for Docker Compose to container
+  orchestrators such as Kubernetes. You can follow the instructions for your specific operating system from the official
+  Kompose documentation [here](https://kompose.io/installation/)
+
+### Creating Kubernetes deployment and services files using Kompose:
+
+1. Navigate to the main directory of the project and create docker-compose.kompose.yml file and add the following
+   content to it
+
+ ```yaml
+# new version of docker-compose file to work correctly with Kompose CLI conversion tool
+version: "3"
+
+services:
+
+  postgres:
+    # we use prebuilt image as our base image (make sure you specify the same
+    # version to avoid any breaking changes that may come in later versions)
+    image: postgres:13.1
+    # setting the container name to avoid the default generated container name so that we can
+    # reference the container with their names as hosts form our codebase or from another containers
+    container_name: postgres
+    # Expose ports without publishing them to the host machine
+    expose:
+      - "5432"
+    # we pass the environment variables with their values
+    environment:
+      - POSTGRES_USERNAME=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=udagram-postgres
+
+  frontend:
+    # specify image tag as latest to always pull the latest image that we pushed to docker hub
+    image: rofaeilashaiaa/udagram-frontend:latest
+    # setting the container name to avoid the default generated container name so that we can
+    # reference the container with their names as hosts form our codebase or from another containers
+    container_name: frontend
+    # Expose ports without publishing them to the host machine
+    expose:
+      - "8100"
+    # we pass the environment variables with their values
+    environment:
+      - FRONTEND_PORT=8100
+
+  users-microservice:
+    # specify image tag as latest to always pull the latest image that we pushed to docker hub
+    image: rofaeilashaiaa/udagram-users-microservice:latest
+    # setting the container name to avoid the default generated container name so that we can
+    # reference the container with their names as hosts form our codebase or from another containers
+    container_name: users-microservice
+    # Expose ports without publishing them to the host machine
+    expose:
+      - "8181"
+    # we pass the environment variables with their values
+    environment:
+      - POSTGRES_USERNAME=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=udagram-postgres
+      - POSTGRES_HOST=postgres
+      - AWS_BUCKET=udagram-monolith-to-microservices
+      - AWS_REGION=us-east-1
+      - JWT_SECRET=anysecret
+      - BACKEND_PORT=8181
+
+  feed-microservice:
+    # specify image tag as latest to always pull the latest image that we pushed to docker hub
+    image: rofaeilashaiaa/udagram-feed-microservice:latest
+    # setting the container name to avoid the default generated container name so that we can
+    # reference the container with their names as hosts form our codebase or from another containers
+    container_name: feed-microservice
+    # we pass the environment variables with their values
+    # Expose ports without publishing them to the host machine
+    expose:
+      - "8181"
+    environment:
+      - POSTGRES_USERNAME=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=udagram-postgres
+      - POSTGRES_HOST=postgres
+      - AWS_BUCKET=udagram-monolith-to-microservices
+      - AWS_REGION=us-east-1
+      - JWT_SECRET=anysecret
+      - BACKEND_PORT=8181
+      - ENV_TYPE=developmentx
+
+  reverse-proxy:
+    # specify image tag as latest to always pull the latest image that we pushed to docker hub
+    image: rofaeilashaiaa/udagram-reverse-proxy:latest
+    # setting the container name to avoid the default generated container name so that we can
+    # reference the container with their names as hosts form our codebase or from another containers
+    container_name: reverse-proxy
+    # Enable port mapping from the container to the host so we can access the backend on that port
+    ports:
+      - "8080"
+    # we pass the environment variables with their values
+    environment:
+      - NGINX_PROXY_PORT=8080
+
+ ```
+
+2. Make sure you are in the main directory of the project by running `ls` and make sure that
+   the `docker-compose.kompose.yml` is listed.
+3. Run the command `kompose convert docker-compose.kompose.yml`, this command will convert the new and modified version
+   of docker compose file to kubernetes deployment.yml and service.yml files for each container section you have in the
+   docker compose file. After you run this command, you will see the following output in your terminal (which indicate
+   that the deployment files, and the services files were created successfully):
+   ```shell
+    INFO Kubernetes file "feed-microservice-service.yaml" created 
+    INFO Kubernetes file "frontend-service.yaml" created
+    INFO Kubernetes file "postgres-service.yaml" created
+    INFO Kubernetes file "reverse-proxy-service.yaml" created
+    INFO Kubernetes file "users-microservice-service.yaml" created
+    INFO Kubernetes file "feed-microservice-deployment.yaml" created
+    INFO Kubernetes file "frontend-deployment.yaml" created
+    INFO Kubernetes file "postgres-deployment.yaml" created
+    INFO Kubernetes file "reverse-proxy-deployment.yaml" created
+    INFO Kubernetes file "users-microservice-deployment.yaml" created
     ```
-   To have your code fixed automatically, run
-    ```bash
-    npx eslint --ext .js,.ts src/ --fix
+
+### Starting and Using MiniKube
+
+4. Before deploying the kubernetes cluster on minikube, we need to make sure that minikube is running. We can run
+   minikube by executing `minikube star`, minikube will take a few minutes to get the vm of the cluster up and running.
+5. To make sure that minikube is ready for kubernetes deployment we first need to run `kubectl get pods -A` and wait
+   until all the listed object to be running by checking the output of the previous command as shown below
+   ```shell
+    NAMESPACE     NAME                                  READY   STATUS    RESTARTS   AGE
+    kube-system   coredns-74ff55c5b-4tvvr               1/1     Running   1          16h
+    kube-system   etcd-minikube                         1/1     Running   1          16h
+    kube-system   kube-apiserver-minikube               1/1     Running   1          16h
+    kube-system   kube-controller-manager-minikube      1/1     Running   1          16h
+    kube-system   kube-proxy-jz8r8                      1/1     Running   1          16h
+    kube-system   kube-scheduler-minikube               1/1     Running   1          16h
+    kube-system   storage-provisioner                   1/1     Running   3          16h
     ```
-4. Over time, our code will become outdated and inevitably run into security vulnerabilities. To address them, you can
-   run:
-    ```bash
-    npm audit fix
+6. For additional insight into your cluster state, minikube bundles the Kubernetes Dashboard, allowing you to get easily
+   acclimated to your new environment by executing `minikube dashboard` which will open the dashboard in your browser.
+
+### Deploying the cluster (pods, containers and services) using Kubernetes CLI (kubectl)
+
+7. Make sure you are in the main directory of the project where the generated deployment.yml and service.yml files are
+   located. To deploy our kubernetes cluster we need to run the following command
+   ```shell
+   kubectl apply -f .
+   ```
+   which will take each deployment and service file in the current directory and deploy it to kubernetes and will output
+   the following to the terminal
+   ```shell
+    deployment.apps/feed-microservice created
+    service/feed-microservice created
+    deployment.apps/frontend created
+    service/frontend created
+    deployment.apps/postgres created
+    service/postgres created
+    deployment.apps/reverse-proxy created
+    service/reverse-proxy created
+    deployment.apps/users-microservice created
+    service/users-microservice created
     ```
-5. In `set_env.sh`, environment variables are set with `export $VAR=value`. Setting it this way is not permanent; every
-   time you open a new terminal, you will have to run `set_env.sh` to reconfigure your environment variables. To verify
-   if your environment variable is set, you can check the variable with a command like `echo $POSTGRES_USERNAME`.
+   Or you can append the wanted files after `kubectl apply` with `-f` flag before each file as the following command
+   ```shell
+   kubectl apply -f feed-microservice-service.yaml -f feed-microservice-deployment.yaml
+   ```
+8. kubernetes will take some time (5-15 minutes) until the cluster is fully deployed as it needs to first pull the
+   containers images from the container registry (docker hub), then creating each container and its replicas as
+   specified. we can run `kubectl get pods -A` and wait until all the listed containers to be running by checking the
+   output of the previous command as shown below
+      ```shell
+    NAMESPACE     NAME                                  READY   STATUS    RESTARTS   AGE
+    default       feed-microservice-8695bdc88d-2jhh2    1/1     Running   1          169m
+    default       frontend-c956c44f-bkc8w               1/1     Running   0          169m
+    default       postgres-6f5f7f8c67-27x89             1/1     Running   0          169m
+    default       reverse-proxy-7d59d5947c-k5gct        1/1     Running   0          169m
+    default       users-microservice-6f4c59cbbb-mtxv8   1/1     Running   1          169m
+    kube-system   coredns-74ff55c5b-4tvvr               1/1     Running   1          17h
+    kube-system   etcd-minikube                         1/1     Running   1          17h
+    kube-system   kube-apiserver-minikube               1/1     Running   1          17h
+    kube-system   kube-controller-manager-minikube      1/1     Running   1          17h
+    kube-system   kube-proxy-jz8r8                      1/1     Running   1          17h
+    kube-system   kube-scheduler-minikube               1/1     Running   1          17h
+    kube-system   storage-provisioner                   1/1     Running   3          17h
+    ```
+   Or by executing `minikube dashboard` which will open the kubernetes dashboard in your browser.
+
+### Run and access the deployed services locally (frontend website and backend api)
+
+9. To access the frontend service from the browser, we first need to use kubectl to forward the port of the reverse
+   proxy service by executing the command `kubectl port-forward service/reverse-proxy 8080:8080` which will redirect
+   requests to localhost:8080 to the reverse proxy service on port 8080 inside the cluster, and the reverse proxy will
+   be available at [http://localhost:8080/](http://localhost:8080/). We can
+   open [http://localhost:8080/api/v0/feed/](http://localhost:8080/api/v0/feed/) to verify that the reverse proxy
+   service, the postgres service, and the feed microservice are running correctly.
+   > _tip_: Leave the terminal open that you executed the command in it
+   > (`kubectl port-forward service/reverse-proxy 8080:8080`) and don't close the terminal until we test both the
+   > backend, and the frontend otherwise the frontend won't be able to access the reverse proxy on localhost, and
+   > will give you an error `Http failure response for http://localhost:8080/api/v0/feed: 0 Unknown Error`
+
+10. Now that our reverse proxy api is accessible on localhost, in order to access the frontend service from the browser,
+    we need to use the same command that allowed kubectl to forward the port of the service in the previous step. Open a
+    new terminal and execute the command `kubectl port-forward service/frontend 8100:8100` which will redirect requests
+    on localhost:8100 to the frontend service on port 8100 inside the cluster, and the website will be available
+    at [http://localhost:8100/](http://localhost:8100/). We can
+    open [http://localhost:8100/home](http://localhost:8100/home) to verify that the frontend service is running
+    correctly.
+
+> _tip_: Uploading new post with a photo using the frontend website won't work because we haven't configured the aws
+> node sdk to work inside the cluster. So, it needs to be deployed on the Amazon EKS in order for the backend service to
+> be configured to access the s3 bucket after we give the EKS the permission  to do that (through adding an IAM role).
+> To verify that our frontend and backend running we can create a new account using the register button and log in using
+> the same account we created.
+
+### Creating another replica for one of the microservices
+
+11. We need to create another replica for the feed-microservice. To achieve that we need to add increase the number of
+    replicas in `feed-microservice-deployment.yaml` to `2` and after that executing the
+    command `kubectl apply -f feed-microservice-deployment.yaml` which will
+    output `deployment.apps/feed-microservice configured` which means that the kubernetes received the new configuration
+    and will update our deployment with the new configuration.
+12. we can verify our new configurations by running `kubectl get pods -A` and wait until the new container to be running
+    by checking the output of the previous command as shown below
+      ```shell
+    NAMESPACE     NAME                                  READY   STATUS    RESTARTS   AGE
+    default       feed-microservice-8695bdc88d-2jhh2    1/1     Running   1          169m
+    default       feed-microservice-8695bdc88d-tpnzg    1/1     Running   1          169m
+    default       frontend-c956c44f-bkc8w               1/1     Running   0          169m
+    default       postgres-6f5f7f8c67-27x89             1/1     Running   0          169m
+    default       reverse-proxy-7d59d5947c-k5gct        1/1     Running   0          169m
+    default       users-microservice-6f4c59cbbb-mtxv8   1/1     Running   1          169m
+    kube-system   coredns-74ff55c5b-4tvvr               1/1     Running   1          17h
+    kube-system   etcd-minikube                         1/1     Running   1          17h
+    kube-system   kube-apiserver-minikube               1/1     Running   1          17h
+    kube-system   kube-controller-manager-minikube      1/1     Running   1          17h
+    kube-system   kube-proxy-jz8r8                      1/1     Running   1          17h
+    kube-system   kube-scheduler-minikube               1/1     Running   1          17h
+    kube-system   storage-provisioner                   1/1     Running   3          17h
+    ```
+
+### Configure scaling and self-healing for each service with CPU metrics
+
+13. To configure a deployment feature that allows additional pods to be created when a CPU usage threshold is reached,
+    we need to create HPA (Horizontal Pod Autoscaler) using the command
+    `kubectl autoscale deployment <NAME> --cpu-percent=<CPU_PERCENTAGE>  --min=<MIN_REPLICAS> --max=<MAX_REPLICAS>`.
+
+14. Run the previous command for the reverse proxy deployment, the users deployment and the feed deployment by executing
+    the following commands:
+    ```shell
+    kubectl autoscale deployment reverse-proxy  --cpu-percent=70  --min=1  --max=5
+    kubectl autoscale deployment users-microservice  --cpu-percent=70  --min=1  --max=5
+    kubectl autoscale deployment feed-microservice  --cpu-percent=70  --min=1  --max=5
+    ```
+    You will see the following outputs for each of the previous command:
+    ```shell
+    horizontalpodautoscaler.autoscaling/reverse-proxy autoscaled
+    horizontalpodautoscaler.autoscaling/users-microservice autoscaled
+    horizontalpodautoscaler.autoscaling/feed-microservice autoscaled
+    ```
+
+15. To verify that we created HPA for the three deployment: the reverse proxy deployment, the users deployment and the
+    feed deployment, we can execute the following command `kubectl get hpa`  which will output the following to the
+    terminal:
+    ```shell
+    NAME                 REFERENCE                       TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+    feed-microservice    Deployment/feed-microservice    <unknown>/70%   1         5         2          2m18s
+    reverse-proxy        Deployment/reverse-proxy        <unknown>/70%   1         5         1          5m36s
+    users-microservice   Deployment/users-microservice   <unknown>/70%   1         5         1          2m46s
+    ```
+    Now if one of our pods its CPU usage increased above the specified threshold (which is 70% in our case) the
+    kubernetes will create another pod (until we reach the maximum numbers specified), and the service of this
+    deployment will redirect all traffic to all the available pods.

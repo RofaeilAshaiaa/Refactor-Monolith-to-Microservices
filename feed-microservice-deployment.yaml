@@ -13,7 +13,7 @@ spec:
   selector:
     matchLabels:
       io.kompose.service: feed-microservice
-  strategy: {}
+  strategy: { }
   template:
     metadata:
       annotations:
@@ -47,6 +47,12 @@ spec:
           name: feed-microservice
           ports:
             - containerPort: 8181
-          resources: {}
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "250m"
+            limits:
+              memory: "64Mi"
+              cpu: "250m"
       restartPolicy: Always
-status: {}
+status: { }

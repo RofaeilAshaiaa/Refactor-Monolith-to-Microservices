@@ -8,30 +8,31 @@
 * [Project Tasks](#project-tasks)
 * [Prerequisite](#prerequisite)
 * [Steps for a local setup (without containers)](#steps-for-a-local-setup-without-containers)
-    * [S3 Setup](#s3-setup)
-    * [Database Setup (PostgresSQL)](#database-setup-postgresql)
-    * [Backend Setup](#backend-setup)
-    * [Frontend Setup](#frontend-setup)
+    * [a. S3 Setup](#s3-setup)
+    * [b. Database Setup (PostgresSQL)](#database-setup-postgresql)
+    * [c. Backend Setup](#backend-setup)
+    * [d. Frontend Setup](#frontend-setup)
 * [Steps for a local setup using Docker and Docker Compose](#steps-for-a-local-setup-using-docker-and-docker-compose)
-    * [Prerequisites for using docker and docker compose](#prerequisites-for-using-docker-and-docker-compose)
-    * [Creating the containers using docker files](#creating-the-containers-using-docker-files)
-    * [Containers Orchestration using Docker Compose](#containers-orchestration-using-docker-compose)
-    * [Running the services and the containers using docker compose](#running-the-services-and-the-containers-using-docker-compose)
+    * [a. Prerequisites for using docker and docker compose](#prerequisites-for-using-docker-and-docker-compose)
+    * [b. Creating the containers using docker files](#creating-the-containers-using-docker-files)
+    * [c. Containers Orchestration using Docker Compose](#containers-orchestration-using-docker-compose)
+    * [d. Running the services and the containers using docker compose](#running-the-services-and-the-containers-using-docker-compose)
 * [Deployment using Kubernetes and MiniKube (local deployment)](#deployment-using-kubernetes-and-minikube-local-deployment)
-    * [Creating Kubernetes deployment and services files using Kompose](#creating-kubernetes-deployment-and-services-files-using-kompose)
-    * [Starting and Using MiniKube](#starting-and-using-minikube)
-    * [Deploying the cluster (pods, containers and services) using Kubernetes CLI (kubectl)](#deploying-the-cluster-pods-containers-and-services-using-kubernetes-cli-kubectl)
-    * [Run and access the deployed services locally (frontend website and backend api)](#run-and-access-the-deployed-services-locally-frontend-website-and-backend-api)
-    * [Creating another replica for one of the microservices](#creating-another-replica-for-one-of-the-microservices)
-    * [Configure scaling and self-healing for each service with CPU metrics](#configure-scaling-and-self-healing-for-each-service-with-cpu-metrics)
+    * [a. Creating Kubernetes deployment and services files using Kompose](#creating-kubernetes-deployment-and-services-files-using-kompose)
+    * [b. Starting and Using MiniKube](#starting-and-using-minikube)
+    * [c. Deploying the cluster (pods, containers and services) using Kubernetes CLI (kubectl)](#deploying-the-cluster-pods-containers-and-services-using-kubernetes-cli-kubectl)
+    * [d. Run and access the deployed services locally (frontend website and backend api)](#run-and-access-the-deployed-services-locally-frontend-website-and-backend-api)
+    * [e. Creating another replica for one of the microservices](#creating-another-replica-for-one-of-the-microservices)
+    * [f. Configure scaling and self-healing for each service with CPU metrics](#configure-scaling-and-self-healing-for-each-service-with-cpu-metrics)
 * [Deployment on AWS EKS using Kubernetes](#deployment-on-aws-eks-using-kubernetes)
     * [1. Creating an EKS Cluster](#creating-an-eks-cluster)
     * [2. Creating a Node Group in the cluster](#creating-a-node-group-in-the-cluster)
     * [3. Switch kubectl context to the EKS Cluster](#switch-kubectl-context-to-the-eks-cluster)
-    * [4. Using eksctl to create EKS cluster, create Node Group, and switch kubectl Context (Alternative to setp 1,2 and 3)](#)
-    * [5. Deploying the cluster (pods, containers and services) to EKS using Kubernetes CLI (kubectl)](#deploying-the-cluster-pods-containers-and-services-to-eks-using-kubernetes-cli-kubectl)
-    * [6. Get pods and services info from the cluster](#get-pods-and-services-info-from-the-cluster)
-    * [7. Configure HPA for each service and Accessing pods logs](#configure-hpa-for-each-service-and-accessing-pods-logs)
+    * [4. Deploying the cluster (pods, containers and services) to EKS using Kubernetes CLI (kubectl)](#deploying-the-cluster-pods-containers-and-services-to-eks-using-kubernetes-cli-kubectl)
+    * [5. Get pods and services info from the cluster](#get-pods-and-services-info-from-the-cluster)
+    * [6. Configure HPA for each service and Accessing pods logs](#configure-hpa-for-each-service-and-accessing-pods-logs)
+    * [7. [Alternative] Using eksctl to create EKS cluster, create Node Group, and switch kubectl Context](#alternative-using-eksctl-to-create-eks-cluster-create-node-group-and-switch-kubectl-context)
+* [Clean up the AWS resources](#clean-up-the-aws-resources)
 * [Useful Links](#useful-links)
 
 <!--te-->
@@ -809,13 +810,53 @@ services:
     kube-system   storage-provisioner                   1/1     Running   3          17h
 ```
 
+Or we can run the command `kubectl scale deployments reverse-proxy --replicas=2` without modifying the deployment.yml
+file and, we will get the same result with following output to the terminal `deployment.apps/reverse-proxy scaled`.
+
 ### Configure scaling and self-healing for each service with CPU metrics
 
-13. To configure a deployment feature that allows additional pods to be created when a CPU usage threshold is reached,
+13. First you need to install [Kubernetes Metrics Server](https://github.com/kubernetes-sigs/metrics-server), which is
+    as described in the official docs:
+
+> Metrics Server is a scalable, efficient source of container resource metrics for Kubernetes built-in autoscaling pipelines
+> Metrics Server collects resource metrics from Kubelets and exposes them in Kubernetes apiserver through Metrics API
+> for use by Horizontal Pod Autoscaler and Vertical Pod Autoscaler.
+
+So, in order for Horizontal Pod Autoscaler to work we must install the Kubernetes Metrics Server first. To install the
+latest version of Kubernetes Metrics Server, execute the
+command ` kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml`
+you will get the following output to the terminal
+
+```shell
+serviceaccount/metrics-server created
+clusterrole.rbac.authorization.k8s.io/system:aggregated-metrics-reader created
+clusterrole.rbac.authorization.k8s.io/system:metrics-server created
+rolebinding.rbac.authorization.k8s.io/metrics-server-auth-reader created
+clusterrolebinding.rbac.authorization.k8s.io/metrics-server:system:auth-delegator created
+clusterrolebinding.rbac.authorization.k8s.io/system:metrics-server created
+service/metrics-server created
+deployment.apps/metrics-server created
+apiservice.apiregistration.k8s.io/v1beta1.metrics.k8s.io created
+```
+
+14. Make sure you have the `resources` section with `limits` and `requests` defined in your deployment.yml file for the
+    deployment you want to configure HPA for as Horizontal Pod Autoscaler won't work if you did specify that in your
+    deployment file. So the resources section should be similar to the following
+    ```yaml
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "250m"
+      limits:
+        emory: "128Mi"
+        cpu: "500m"
+    ```
+
+15. To configure a deployment feature that allows additional pods to be created when a CPU usage threshold is reached,
     we need to create HPA (Horizontal Pod Autoscaler) using the command
     `kubectl autoscale deployment <NAME> --cpu-percent=<CPU_PERCENTAGE>  --min=<MIN_REPLICAS> --max=<MAX_REPLICAS>`.
 
-14. Run the previous command for the reverse proxy deployment, the users deployment and the feed deployment by executing
+16. Run the previous command for the reverse proxy deployment, the users deployment and the feed deployment by executing
     the following commands:
     ```shell
     kubectl autoscale deployment reverse-proxy  --cpu-percent=70  --min=1  --max=5
@@ -830,7 +871,7 @@ services:
     horizontalpodautoscaler.autoscaling/feed-microservice autoscaled
     ```
 
-15. To verify that we created HPA for the three deployment: the reverse proxy deployment, the users deployment and the
+17. To verify that we created HPA for the three deployment: the reverse proxy deployment, the users deployment and the
     feed deployment, we can execute the following command `kubectl get hpa`  which will output the following to the
     terminal:
     ```shell
@@ -877,81 +918,56 @@ services:
 
 ### Creating a Node Group in the cluster
 
-1. Make sure you first created the Amazon EKS node IAM role as we will need this role when we are creating
-   the `Node Goup`. If you didn't create the role you can check the setups from the official docs
-   described [here](https://docs.aws.amazon.com/eks/latest/userguide/create-node-role.html#create-worker-node-role).
+10. Make sure you first created the Amazon EKS node IAM role as we will need this role when we are creating
+    the `Node Goup`. If you didn't create the role you can check the setups from the official docs
+    described [here](https://docs.aws.amazon.com/eks/latest/userguide/create-node-role.html#create-worker-node-role).
 
-1. Make sure the cluster you created in the previous steps is in `Active` state by clicking on the cluster and checking
-   whether it's still creating or finished and display `Active`.
+11. Make sure the cluster you created in the previous steps is in `Active` state by clicking on the cluster and checking
+    whether it's still creating or finished and display `Active`.
 
 1. From the cluster details screen choose `Configuration` then click on `Compute`. From there you will get an empty list
    of `Node Groups`. Click on `Add Node Group` button to launch the wizard of creating a node group.
 
-1. You will go the first screen of creating a node group which is `Configure Node Group`. Insert the name of the node
-   group you want then leave the other options to the defaults and click on `Next`.
+12. You will go the first screen of creating a node group which is `Configure Node Group`. Insert the name of the node
+    group you want then leave the other options to the defaults and click on `Next`.
 
-1. You will go the second screen of creating a node group which is `Set compute and scaling configuration`. Configure
-   the EC2 instance type as you want (in our case we will choose on demand instances as our capacity type and t3 micro
-   as our instance type for cost optimization). Also make sure that under `Node Group scaling configuration` you set the
-   minimum size, maximum size and the desired size to 1 and click on `Next`.
+13. You will go the second screen of creating a node group which is `Set compute and scaling configuration`. Configure
+    the EC2 instance type as you want (in our case we will choose on demand instances as our capacity type and t3 micro
+    as our instance type for cost optimization). Also make sure that under `Node Group scaling configuration` you set
+    the minimum size, maximum size and the desired size to 1 and click on `Next`.
 
-1. You will go the third screen of creating a node group which is `Node Group network configuration`. make sure you
-   enable the option next to `Allow remote access to nodes` and select the SSH key from the dropdown menu. if you don't
-   have any SSH keys to your EC2 instances you can create one by following the steps
-   documented [here](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html).
+14. You will go the third screen of creating a node group which is `Node Group network configuration`. make sure you
+    enable the option next to `Allow remote access to nodes` and select the SSH key from the dropdown menu. if you don't
+    have any SSH keys to your EC2 instances you can create one by following the steps
+    documented [here](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html).
 
-1. You will go the final screen of creating a node group which is `Review and create`. Review the options you selected
-   then click on `Create` button to create the node group. It will take a few minutes for the node group to created (
-   from 5-15 minutes).
+15. You will go the final screen of creating a node group which is `Review and create`. Review the options you selected
+    then click on `Create` button to create the node group. It will take a few minutes for the node group to created (
+    from 5-15 minutes).
 
 ### Switch kubectl context to the EKS Cluster
 
-1. Run the command `aws eks --region <region-code> update-kubeconfig --name <cluster_name>` to take the kubernetes
-   cluster that you created and bind it to the kubectl commands in order to control and manage our cluster from our
-   local computer using the kubernetes CLI (kubectl). In our case we will run the
-   command `aws eks --region us-east-1 update-kubeconfig --name Udagram` which will output to the terminal this
-   message `Added new context arn:aws:eks:us-east-1:536643963445:cluster/Udagram to /home/matrix/.kube/config`.
+16. Run the command `aws eks --region <region-code> update-kubeconfig --name <cluster_name>` to take the kubernetes
+    cluster that you created and bind it to the kubectl commands in order to control and manage our cluster from our
+    local computer using the kubernetes CLI (kubectl). In our case we will run the
+    command `aws eks --region us-east-1 update-kubeconfig --name Udagram` which will output to the terminal this
+    message `Added new context arn:aws:eks:us-east-1:536643963445:cluster/Udagram to /home/matrix/.kube/config`.
 
-1. To verify that our operation worked successfully we can use the command ` kubectl get svc` which will output to the
-   terminal the following output
+17. To verify that our operation worked successfully we can use the command ` kubectl get svc` which will output to the
+    terminal the following output
+
    ```shell
     NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
     kubernetes   ClusterIP   10.100.0.1   <none>        443/TCP   53m
-    ```
-
-### Using eksctl to create EKS cluster, create Node Group, and switch kubectl Context
-
-1. Make sure you have the [eksctl CLI](https://eksctl.io) installed in your system. eksctl is a simple CLI tool for
-   creating clusters on EKS - Amazon's new managed Kubernetes service for EC2 to install it You can follow the
-   instructions for your specific operating system from the official
-   documentation [here](https://eksctl.io/introduction/#installation)
-
-2. Verify the installation of eksctl by executing `eksctl version` you will get a result depending on the version you
-   installed, and it will be something similar to `0.35.0`.
-
-3. Run the following command to create an eks cluster called "udagram", and a node group called "udagram" inside the
-   cluster using eksctl which create a cloud formation template to create the stack:
-
-    ```shell
-    eksctl create cluster --name udagram --with-oidc --nodegroup-name udagram --nodes 1 --nodes-min 1 --nodes-max 1 --node-volume-size 10 --node-type t3.micro --timeout 60m
-   ```
-
-   We specify some flags: --nodes for the total number of nodes, --nodes-min and --nodes-max for the minimum and the
-   maximum nodes in ASG, --node-volume-size for the node volume size in GB, --with-oidc to enable the IAM OIDC provider,
-   --node-type for the node ec2 instance type, --nodegroup-name for the name of the nodegroup, --name the EKS cluster
-   name
-
-4. You Must create a node group after the previous command in order for kubernetes to be able to deploy you pods
-   otherwise the pods will be in pending state indefinitely. You can check the steps for creating a node group using the
-   aws console [here](#creating-a-node-group-in-the-cluster)
+  ```
 
 > _tip_: Before proceeding to the next step, make sure that the cluster, and the node group creation has finished,
 > and the node group and, the cluster status is `Active`.
 
 ### Deploying the cluster (pods, containers and services) to EKS using Kubernetes CLI (kubectl)
 
-1. Navigate to the main directory of the project where the deployment.yml and service.yml files are located for our
-   microservices then open a terminal and run the following command
+18. Navigate to the main directory of the project where the deployment.yml and service.yml files are located for our
+    microservices then open a terminal and run the following command
 
    ```shell
     kubectl apply -f feed-microservice-deployment.yaml  -f feed-microservice-service.yaml 
@@ -959,7 +975,8 @@ services:
    -f postgres-service.yaml -f reverse-proxy-deployment.yaml -f reverse-proxy-service.yaml -f frontend-deployment.yaml 
    -f frontend-service.yaml
    ```
-   You should see the following output (to verify the command was executed successfully) in the terminal
+
+You should see the following output (to verify the command was executed successfully) in the terminal
 
    ```shell
     deployment.apps/feed-microservice created
@@ -974,8 +991,8 @@ services:
     service/frontend created
    ```
 
-1. To get the current info about the cluster run `kubectl cluster-info`. You should see the following output (to verify
-   the command was executed successfully) in the terminal
+19. To get the current info about the cluster run `kubectl cluster-info`. You should see the following output (to verify
+    the command was executed successfully) in the terminal
 
    ```shell
     Kubernetes control plane is running at https://591211476A097BAF081C5530A06E4C91.gr7.us-east-1.eks.amazonaws.com
@@ -986,9 +1003,9 @@ services:
 
 ### Get pods and services info from the cluster
 
-To verify Kubernetes pods are deployed properly and to get information about the current pods and, their status run the
-command `kubectl get pods`. You should see the following output (to verify the command was executed successfully) in the
-terminal
+20. To verify Kubernetes pods are deployed properly and to get information about the current pods and, their status run
+    the command `kubectl get pods`. You should see the following output (to verify the command was executed
+    successfully) in the terminal
 
    ```shell
     NAME                                  READY   STATUS    RESTARTS   AGE
@@ -1000,8 +1017,8 @@ terminal
     users-microservice-545f6ffbcd-m8r2w   1/1     Running   2          112s
    ```
 
-To verify Kubernetes services are properly set up `kubectl describe services`. You should see the following output (to
-verify the command was executed successfully) in the terminal
+21. To verify Kubernetes services are properly set up `kubectl describe services`. You should see the following output (
+    to verify the command was executed successfully) in the terminal
 
    ```shell
     Name:              feed-microservice
@@ -1108,10 +1125,10 @@ verify the command was executed successfully) in the terminal
 
 ### Configure HPA for each service and Accessing pods logs
 
-1. To configure scaling and self-healing for each service with CPU metrics refer to the steps
-   described [here](#configure-scaling-and-self-healing-for-each-service-with-cpu-metrics). To verify that you have
-   horizontal scaling set against CPU usage run the command `kubectl describe hpa`. You should see the following
-   output (to verify the command was executed successfully) in the terminal
+22. To configure scaling and self-healing for each service with CPU metrics refer to the steps
+    described [here](#configure-scaling-and-self-healing-for-each-service-with-cpu-metrics). To verify that you have
+    horizontal scaling set against CPU usage run the command `kubectl describe hpa`. You should see the following
+    output (to verify the command was executed successfully) in the terminal
 
    ```shell
     NAME                 REFERENCE                       TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
@@ -1121,10 +1138,9 @@ verify the command was executed successfully) in the terminal
     users-microservice   Deployment/users-microservice   <unknown>/70%   1         5         1          55m
    ```
 
-
-1. To verify that user activity is logged you can run the command `kubectl logs <your pod name>`, in our case
-   it's ` kubectl logs users-microservice-545f6ffbcd-m8r2w`. You should see the following output (to verify the command
-   was executed successfully) in the terminal
+23. To verify that user activity is logged you can run the command `kubectl logs <your pod name>`, in our case
+    it's ` kubectl logs users-microservice-545f6ffbcd-m8r2w`. You should see the following output (to verify the command
+    was executed successfully) in the terminal
 
    ```shell
     Executing (default): CREATE TABLE IF NOT EXISTS "User" ("email" VARCHAR(255) , "passwordHash" VARCHAR(255), "createdAt" TIMESTAMP WITH TIME ZONE, "updatedAt" TIMESTAMP WITH TIME ZONE, PRIMARY KEY ("email"));
@@ -1143,6 +1159,48 @@ verify the command was executed successfully) in the terminal
     Executing (default): SELECT "email", "passwordHash", "createdAt", "updatedAt" FROM "User" AS "User" WHERE "User"."email" = 'emcomail@email.com';
     1/10/2021, 12:26:29 AM: edfcbf3b-7169-4c33-989f-0375009308d1 - User with email: emcomail@email.com attempt to login failed
    ```
+
+### [Alternative] Using eksctl to create EKS cluster, create Node Group, and switch kubectl Context
+
+1. Make sure you have the [eksctl CLI](https://eksctl.io) installed in your system. eksctl is a simple CLI tool for
+   creating clusters on EKS - Amazon's new managed Kubernetes service for EC2 to install it You can follow the
+   instructions for your specific operating system from the official
+   documentation [here](https://eksctl.io/introduction/#installation)
+
+2. Verify the installation of eksctl by executing `eksctl version` you will get a result depending on the version you
+   installed, and it will be something similar to `0.35.0`.
+
+3. Run the following command to create an eks cluster called "udagram", and a node group called "udagram" inside the
+   cluster using eksctl which create a cloud formation template to create the stack:
+
+    ```shell
+    eksctl create cluster --name udagram --with-oidc --nodegroup-name udagram --nodes 1 --nodes-min 1 --nodes-max 1 --node-volume-size 10 --node-type t3.micro --timeout 60m
+   ```
+
+   We specify some flags: --nodes for the total number of nodes, --nodes-min and --nodes-max for the minimum and the
+   maximum nodes in ASG, --node-volume-size for the node volume size in GB, --with-oidc to enable the IAM OIDC provider,
+   --node-type for the node ec2 instance type, --nodegroup-name for the name of the nodegroup, --name the EKS cluster
+   name
+
+4. You Must create a node group after the previous command in order for kubernetes to be able to deploy you pods
+   otherwise the pods will be in pending state indefinitely. You can check the steps for creating a node group using the
+   aws console [here](#creating-a-node-group-in-the-cluster)
+
+## Clean up the AWS resources
+
+1. Run the command `kubectl delete --all services --namespace=default` to delete all deployments in the kubernetes
+   cluster.
+
+2. Run the command `kubectl delete --all deployments --namespace=default` to delete all deployments in the kubernetes
+   cluster.
+3. Run the command `kubectl delete hpa --all` to delete all the HPA for any deployments.
+
+4. Go to AWS EKS console and delete the node group then delete the cluster you created for this project.
+
+5. Go to AWS S3 console and delete the bucket you created for this project.
+
+6. If you used eksctl to create the cluster, you will need to also execute the
+   command `eksctl delete cluster --region=us-east-1 --name=udagram --wait`.
 
 ## Useful Links
 

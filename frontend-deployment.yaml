@@ -13,7 +13,7 @@ spec:
   selector:
     matchLabels:
       io.kompose.service: frontend
-  strategy: {}
+  strategy: { }
   template:
     metadata:
       annotations:
@@ -31,6 +31,12 @@ spec:
           name: frontend
           ports:
             - containerPort: 8100
-          resources: {}
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "500m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
       restartPolicy: Always
-status: {}
+status: { }

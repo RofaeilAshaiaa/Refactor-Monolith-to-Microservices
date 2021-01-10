@@ -24,6 +24,14 @@
     * [Run and access the deployed services locally (frontend website and backend api)](#run-and-access-the-deployed-services-locally-frontend-website-and-backend-api)
     * [Creating another replica for one of the microservices](#creating-another-replica-for-one-of-the-microservices)
     * [Configure scaling and self-healing for each service with CPU metrics](#configure-scaling-and-self-healing-for-each-service-with-cpu-metrics)
+* [Deployment on AWS EKS using Kubernetes](#deployment-on-aws-eks-using-kubernetes)
+    * [1. Creating an EKS Cluster](#creating-an-eks-cluster)
+    * [2. Creating a Node Group in the cluster](#creating-a-node-group-in-the-cluster)
+    * [3. Switch kubectl context to the EKS Cluster](#switch-kubectl-context-to-the-eks-cluster)
+    * [4. Using eksctl to create EKS cluster, create Node Group, and switch kubectl Context (Alternative to setp 1,2 and 3)](#)
+    * [5. Deploying the cluster (pods, containers and services) to EKS using Kubernetes CLI (kubectl)](#deploying-the-cluster-pods-containers-and-services-to-eks-using-kubernetes-cli-kubectl)
+    * [6. Get pods and services info from the cluster](#get-pods-and-services-info-from-the-cluster)
+    * [7. Configure HPA for each service and Accessing pods logs](#configure-hpa-for-each-service-and-accessing-pods-logs)
 
 <!--te-->
 
@@ -97,7 +105,10 @@ application, it should look the same regardless of whether the application is st
 
    Afterwards, we can prevent the file from being included in your solution by adding the file to our `.gitignore` file.
 
-4. **AWS Configuration and Credential File**:
+4. Make sure you have an AWS account before proceeding to the next steps. If you don't have an aws account, you can
+   signup to a new account from [here](https://aws.amazon.com/)
+
+5. **AWS Configuration and Credential File**:
 
    You Must set the aws credentials in order for the backend API node app to work properly with AWS S3
    (and other services later), otherwise you will run into many errors.
@@ -109,11 +120,13 @@ application, it should look the same regardless of whether the application is st
 
    by setting the Environment variables to configure the AWS CLI by executing the following commands after replacing the
    values with your configurations and your credentials
+
    ```bash
    export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
    export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
    export AWS_DEFAULT_REGION=us-west-2 
    ```
+
    For more details on how to do that, this is explained in more details in
    the [docs here](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html)
 
@@ -128,7 +141,8 @@ application, it should look the same regardless of whether the application is st
        access to the bucket.
     4. After the bucket is created, select the bucket from the bucket list then go "Permissions".
     5. From there, edit the Bucket policy to allow read, write and delete from the bucket by adding the following
-    ```
+
+    ```JSON
     {
     "Version": "2012-10-17",
     "Statement": [
@@ -157,7 +171,7 @@ application, it should look the same regardless of whether the application is st
    for the S3 bucket. Select the bucket from the bucket list and click on "Permissions". From there, edit the Bucket
    CORS configuration by adding the following
 
-    ```
+    ```JSON
     [
         {
             "AllowedHeaders": [
@@ -194,13 +208,17 @@ application, it should look the same regardless of whether the application is st
 
 5. Navigate to the udagram-api folder with `cd udagram-api/`. Then download all the package dependencies, by running the
    following command:
+
     ```bash
     npm install .
     ```
+
 6. To run the application locally, run:
+
     ```bash
     npm run dev
     ```
+
 7. You can visit `http://localhost:8080/api/v0/feed` in your web browser to verify that the application is running. You
    should see a JSON payload.
 
@@ -208,21 +226,29 @@ application, it should look the same regardless of whether the application is st
 
 8. Navigate to the udagram-api folder with `cd udagram-frontend/`. Then download all the package dependencies, by
    running the following command:
+
     ```bash
     npm install .
     ```
+
 9. Install Ionic Framework's Command Line tools for us to build and run the application:
+
     ```bash
     npm install -g ionic
     ```
+
 10. Prepare your application by compiling them into static files.
+
     ```bash
     ionic build
     ```
+
 11. Run the application locally using files created from the `ionic build` command.
+
     ```bash
     ionic serve
     ```
+
 12. You can visit `http://localhost:8100` in your web browser to verify that the application is running. You should see
     a web interface.
 
@@ -257,6 +283,7 @@ application, it should look the same regardless of whether the application is st
 
 - Finally, make sure that you set the environment variables of each of the following in your .env in your root
   directory. Your .env file should look similar to the following file:
+
   ```dotenv
     POSTGRES_USERNAME=postgres
     POSTGRES_PASSWORD=password
@@ -502,6 +529,8 @@ http {
 
     ```
 
+-
+
 ### Running the services and the containers using docker compose:
 
 1. Navigate to the main directory of the project and make sure that executing `ls` is showing docker-compose.yml file in
@@ -656,6 +685,7 @@ services:
    minikube by executing `minikube star`, minikube will take a few minutes to get the vm of the cluster up and running.
 5. To make sure that minikube is ready for kubernetes deployment we first need to run `kubectl get pods -A` and wait
    until all the listed object to be running by checking the output of the previous command as shown below
+
    ```shell
     NAMESPACE     NAME                                  READY   STATUS    RESTARTS   AGE
     kube-system   coredns-74ff55c5b-4tvvr               1/1     Running   1          16h
@@ -666,6 +696,7 @@ services:
     kube-system   kube-scheduler-minikube               1/1     Running   1          16h
     kube-system   storage-provisioner                   1/1     Running   3          16h
     ```
+
 6. For additional insight into your cluster state, minikube bundles the Kubernetes Dashboard, allowing you to get easily
    acclimated to your new environment by executing `minikube dashboard` which will open the dashboard in your browser.
 
@@ -673,11 +704,14 @@ services:
 
 7. Make sure you are in the main directory of the project where the generated deployment.yml and service.yml files are
    located. To deploy our kubernetes cluster we need to run the following command
+
    ```shell
    kubectl apply -f .
    ```
+
    which will take each deployment and service file in the current directory and deploy it to kubernetes and will output
    the following to the terminal
+
    ```shell
     deployment.apps/feed-microservice created
     service/feed-microservice created
@@ -690,15 +724,19 @@ services:
     deployment.apps/users-microservice created
     service/users-microservice created
     ```
+
    Or you can append the wanted files after `kubectl apply` with `-f` flag before each file as the following command
+
    ```shell
    kubectl apply -f feed-microservice-service.yaml -f feed-microservice-deployment.yaml
    ```
+
 8. kubernetes will take some time (5-15 minutes) until the cluster is fully deployed as it needs to first pull the
    containers images from the container registry (docker hub), then creating each container and its replicas as
    specified. we can run `kubectl get pods -A` and wait until all the listed containers to be running by checking the
    output of the previous command as shown below
-      ```shell
+
+   ```shell
     NAMESPACE     NAME                                  READY   STATUS    RESTARTS   AGE
     default       feed-microservice-8695bdc88d-2jhh2    1/1     Running   1          169m
     default       frontend-c956c44f-bkc8w               1/1     Running   0          169m
@@ -713,6 +751,7 @@ services:
     kube-system   kube-scheduler-minikube               1/1     Running   1          17h
     kube-system   storage-provisioner                   1/1     Running   3          17h
     ```
+
    Or by executing `minikube dashboard` which will open the kubernetes dashboard in your browser.
 
 ### Run and access the deployed services locally (frontend website and backend api)
@@ -751,7 +790,8 @@ services:
     and will update our deployment with the new configuration.
 12. we can verify our new configurations by running `kubectl get pods -A` and wait until the new container to be running
     by checking the output of the previous command as shown below
-      ```shell
+
+```shell
     NAMESPACE     NAME                                  READY   STATUS    RESTARTS   AGE
     default       feed-microservice-8695bdc88d-2jhh2    1/1     Running   1          169m
     default       feed-microservice-8695bdc88d-tpnzg    1/1     Running   1          169m
@@ -766,7 +806,7 @@ services:
     kube-system   kube-proxy-jz8r8                      1/1     Running   1          17h
     kube-system   kube-scheduler-minikube               1/1     Running   1          17h
     kube-system   storage-provisioner                   1/1     Running   3          17h
-    ```
+```
 
 ### Configure scaling and self-healing for each service with CPU metrics
 
@@ -780,6 +820,7 @@ services:
     kubectl autoscale deployment reverse-proxy  --cpu-percent=70  --min=1  --max=5
     kubectl autoscale deployment users-microservice  --cpu-percent=70  --min=1  --max=5
     kubectl autoscale deployment feed-microservice  --cpu-percent=70  --min=1  --max=5
+    kubectl autoscale deployment frontend  --cpu-percent=70  --min=1  --max=5
     ```
     You will see the following outputs for each of the previous command:
     ```shell
@@ -800,3 +841,304 @@ services:
     Now if one of our pods its CPU usage increased above the specified threshold (which is 70% in our case) the
     kubernetes will create another pod (until we reach the maximum numbers specified), and the service of this
     deployment will redirect all traffic to all the available pods.
+
+## Deployment on AWS EKS using Kubernetes
+
+### Creating an EKS Cluster
+
+1. Go to AWS IAM Console from [here](https://console.aws.amazon.com/iam/home) then click on `Roles` from the sidebar
+   navigation menu, then click on `Create role` button.
+
+2. After click on `Create role` button, the wizard of create a role will launch. Under `Select type of trusted entity`
+   section choose the `AWS service` then select the EKS service and select `EKS - Cluster` then hit `Next: Permissions`.
+
+3. You will get a list of the attached permissions policies, click `Next: Tags`. You will have the option to add tags to
+   the role if you want, add the tag you want then hit `Next:Review`.
+
+4. In the review screen, enter the role name you want to give to this role (and remember the name as you will use it
+   later when we create a new cluster on EKS) then click on `Create Role` button. The role is now created and, we can
+   use it in the next step.
+
+5. Go to AWS EKS console from [here](https://console.aws.amazon.com/eks/home) then click on `Clusters` from the sidebar
+   navigation menu, then click on `Create cluster` button.
+
+6. After click on `Create cluster` button, the wizard of create a cluster will launch. Insert the cluster name you want
+   under the cluster name. Then choose the role you created in the previous steps under the `Cluster Service Role` from
+   the drop down menu. Leave other options to the defaults and click on `Next`.
+
+7. Next step will be `Specify networking` screen. Make sure that under `Cluster endpoint access` option to
+   select `Public`  and leave other options to the defaults then click on `Next`.
+
+8. Next step will be `Configure logging`, specify logging settings that you want and click on `Next`.
+
+9. The final step will be `Review and create`, review the options you selected then click on `Create` to create the
+   cluster. the cluster will take from 5-15 minutes to be created and running.
+
+### Creating a Node Group in the cluster
+
+1. Make sure you first created the Amazon EKS node IAM role as we will need this role when we are creating
+   the `Node Goup`. If you didn't create the role you can check the setups from the official docs
+   described [here](https://docs.aws.amazon.com/eks/latest/userguide/create-node-role.html#create-worker-node-role).
+
+1. Make sure the cluster you created in the previous steps is in `Active` state by clicking on the cluster and checking
+   whether it's still creating or finished and display `Active`.
+
+1. From the cluster details screen choose `Configuration` then click on `Compute`. From there you will get an empty list
+   of `Node Groups`. Click on `Add Node Group` button to launch the wizard of creating a node group.
+
+1. You will go the first screen of creating a node group which is `Configure Node Group`. Insert the name of the node
+   group you want then leave the other options to the defaults and click on `Next`.
+
+1. You will go the second screen of creating a node group which is `Set compute and scaling configuration`. Configure
+   the EC2 instance type as you want (in our case we will choose on demand instances as our capacity type and t3 micro
+   as our instance type for cost optimization). Also make sure that under `Node Group scaling configuration` you set the
+   minimum size, maximum size and the desired size to 1 and click on `Next`.
+
+1. You will go the third screen of creating a node group which is `Node Group network configuration`. make sure you
+   enable the option next to `Allow remote access to nodes` and select the SSH key from the dropdown menu. if you don't
+   have any SSH keys to your EC2 instances you can create one by following the steps
+   documented [here](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html).
+
+1. You will go the final screen of creating a node group which is `Review and create`. Review the options you selected
+   then click on `Create` button to create the node group. It will take a few minutes for the node group to created (
+   from 5-15 minutes).
+
+### Switch kubectl context to the EKS Cluster
+
+1. Run the command `aws eks --region <region-code> update-kubeconfig --name <cluster_name>` to take the kubernetes
+   cluster that you created and bind it to the kubectl commands in order to control and manage our cluster from our
+   local computer using the kubernetes CLI (kubectl). In our case we will run the
+   command `aws eks --region us-east-1 update-kubeconfig --name Udagram` which will output to the terminal this
+   message `Added new context arn:aws:eks:us-east-1:536643963445:cluster/Udagram to /home/matrix/.kube/config`.
+
+1. To verify that our operation worked successfully we can use the command ` kubectl get svc` which will output to the
+   terminal the following output
+   ```shell
+    NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+    kubernetes   ClusterIP   10.100.0.1   <none>        443/TCP   53m
+    ```
+
+### Using eksctl to create EKS cluster, create Node Group, and switch kubectl Context
+
+1. Make sure you have the [eksctl CLI](https://eksctl.io) installed in your system. eksctl is a simple CLI tool for
+   creating clusters on EKS - Amazon's new managed Kubernetes service for EC2 to install it You can follow the
+   instructions for your specific operating system from the official
+   documentation [here](https://eksctl.io/introduction/#installation)
+
+2. Verify the installation of eksctl by executing `eksctl version` you will get a result depending on the version you
+   installed, and it will be something similar to `0.35.0`.
+
+3. Run the following command to create an eks cluster called "udagram", and a node group called "udagram" inside the
+   cluster using eksctl which create a cloud formation template to create the stack:
+
+    ```shell
+    eksctl create cluster --name udagram --with-oidc --nodegroup-name udagram --nodes 1 --nodes-min 1 --nodes-max 1 --node-volume-size 10 --node-type t3.micro --timeout 60m
+   ```
+
+   We specify some flags: --nodes for the total number of nodes, --nodes-min and --nodes-max for the minimum and the
+   maximum nodes in ASG, --node-volume-size for the node volume size in GB, --with-oidc to enable the IAM OIDC provider,
+   --node-type for the node ec2 instance type, --nodegroup-name for the name of the nodegroup, --name the EKS cluster
+   name
+
+4. You Must create a node group after the previous command in order for kubernetes to be able to deploy you pods
+   otherwise the pods will be in pending state indefinitely. You can check the steps for creating a node group using the
+   aws console [here](#creating-a-node-group-in-the-cluster)
+
+> _tip_: Before proceeding to the next step, make sure that the cluster, and the node group creation has finished,
+> and the node group and, the cluster status is `Active`.
+
+### Deploying the cluster (pods, containers and services) to EKS using Kubernetes CLI (kubectl)
+
+1. Navigate to the main directory of the project where the deployment.yml and service.yml files are located for our
+   microservices then open a terminal and run the following command
+
+   ```shell
+    kubectl apply -f feed-microservice-deployment.yaml  -f feed-microservice-service.yaml 
+   -f users-microservice-deployment.yaml -f users-microservice-service.yaml -f postgres-deployment.yaml 
+   -f postgres-service.yaml -f reverse-proxy-deployment.yaml -f reverse-proxy-service.yaml -f frontend-deployment.yaml 
+   -f frontend-service.yaml
+   ```
+   You should see the following output (to verify the command was executed successfully) in the terminal
+
+   ```shell
+    deployment.apps/feed-microservice created
+    service/feed-microservice created
+    deployment.apps/users-microservice created
+    service/users-microservice created
+    deployment.apps/postgres created
+    service/postgres created
+    deployment.apps/reverse-proxy created
+    service/reverse-proxy created
+    deployment.apps/frontend created
+    service/frontend created
+   ```
+
+1. To get the current info about the cluster run `kubectl cluster-info`. You should see the following output (to verify
+   the command was executed successfully) in the terminal
+
+   ```shell
+    Kubernetes control plane is running at https://591211476A097BAF081C5530A06E4C91.gr7.us-east-1.eks.amazonaws.com
+    CoreDNS is running at https://591211476A097BAF081C5530A06E4C91.gr7.us-east-1.eks.amazonaws.com/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+    
+    To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+   ```
+
+### Get pods and services info from the cluster
+
+To verify Kubernetes pods are deployed properly and to get information about the current pods and, their status run the
+command `kubectl get pods`. You should see the following output (to verify the command was executed successfully) in the
+terminal
+
+   ```shell
+    NAME                                  READY   STATUS    RESTARTS   AGE
+    feed-microservice-5df8b47fc4-j7cj8    1/1     Running   0          19s
+    feed-microservice-5df8b47fc4-slkwt    1/1     Running   2          113s
+    frontend-79d8d79d75-qm5qw             1/1     Running   0          108s
+    postgres-787545d4cc-4krjp             1/1     Running   0          111s
+    reverse-proxy-fbdcd6b79-ch4tp         1/1     Running   0          109s
+    users-microservice-545f6ffbcd-m8r2w   1/1     Running   2          112s
+   ```
+
+To verify Kubernetes services are properly set up `kubectl describe services`. You should see the following output (to
+verify the command was executed successfully) in the terminal
+
+   ```shell
+    Name:              feed-microservice
+    Namespace:         default
+    Labels:            io.kompose.service=feed-microservice
+    Annotations:       kompose.cmd: kompose convert -f docker-compose.kompose.yml
+                       kompose.version: 1.22.0 (955b78124)
+    Selector:          io.kompose.service=feed-microservice
+    Type:              ClusterIP
+    IP Families:       <none>
+    IP:                10.100.167.93
+    IPs:               <none>
+    Port:              8181  8181/TCP
+    TargetPort:        8181/TCP
+    Endpoints:         192.168.59.219:8181,192.168.63.192:8181
+    Session Affinity:  None
+    Events:            <none>
+    
+    
+    Name:              frontend
+    Namespace:         default
+    Labels:            io.kompose.service=frontend
+    Annotations:       kompose.cmd: kompose convert -f docker-compose.kompose.yml
+                       kompose.version: 1.22.0 (955b78124)
+    Selector:          io.kompose.service=frontend
+    Type:              ClusterIP
+    IP Families:       <none>
+    IP:                10.100.152.160
+    IPs:               <none>
+    Port:              8100  8100/TCP
+    TargetPort:        8100/TCP
+    Endpoints:         192.168.57.153:8100
+    Session Affinity:  None
+    Events:            <none>
+    
+    
+    Name:              kubernetes
+    Namespace:         default
+    Labels:            component=apiserver
+                       provider=kubernetes
+    Annotations:       <none>
+    Selector:          <none>
+    Type:              ClusterIP
+    IP Families:       <none>
+    IP:                10.100.0.1
+    IPs:               <none>
+    Port:              https  443/TCP
+    TargetPort:        443/TCP
+    Endpoints:         192.168.73.228:443,192.168.97.218:443
+    Session Affinity:  None
+    Events:            <none>
+    
+    
+    Name:              postgres
+    Namespace:         default
+    Labels:            io.kompose.service=postgres
+    Annotations:       kompose.cmd: kompose convert -f docker-compose.kompose.yml
+                       kompose.version: 1.22.0 (955b78124)
+    Selector:          io.kompose.service=postgres
+    Type:              ClusterIP
+    IP Families:       <none>
+    IP:                10.100.8.133
+    IPs:               <none>
+    Port:              5432  5432/TCP
+    TargetPort:        5432/TCP
+    Endpoints:         192.168.33.38:5432
+    Session Affinity:  None
+    Events:            <none>
+    
+    
+    Name:              reverse-proxy
+    Namespace:         default
+    Labels:            io.kompose.service=reverse-proxy
+    Annotations:       kompose.cmd: kompose convert -f docker-compose.kompose.yml
+                       kompose.version: 1.22.0 (955b78124)
+    Selector:          io.kompose.service=reverse-proxy
+    Type:              ClusterIP
+    IP Families:       <none>
+    IP:                10.100.65.6
+    IPs:               <none>
+    Port:              8080  8080/TCP
+    TargetPort:        8080/TCP
+    Endpoints:         192.168.52.27:8080
+    Session Affinity:  None
+    Events:            <none>
+    
+    
+    Name:              users-microservice
+    Namespace:         default
+    Labels:            io.kompose.service=users-microservice
+    Annotations:       kompose.cmd: kompose convert -f docker-compose.kompose.yml
+                       kompose.version: 1.22.0 (955b78124)
+    Selector:          io.kompose.service=users-microservice
+    Type:              ClusterIP
+    IP Families:       <none>
+    IP:                10.100.58.239
+    IPs:               <none>
+    Port:              8181  8181/TCP
+    TargetPort:        8181/TCP
+    Endpoints:         192.168.51.239:8181
+    Session Affinity:  None
+    Events:            <none>
+   ```
+
+### Configure HPA for each service and Accessing pods logs
+
+1. To configure scaling and self-healing for each service with CPU metrics refer to the steps
+   described [here](#configure-scaling-and-self-healing-for-each-service-with-cpu-metrics). To verify that you have
+   horizontal scaling set against CPU usage run the command `kubectl describe hpa`. You should see the following
+   output (to verify the command was executed successfully) in the terminal
+
+   ```shell
+    NAME                 REFERENCE                       TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+    feed-microservice    Deployment/feed-microservice    <unknown>/70%   1         5         2          55m
+    frontend             Deployment/frontend             <unknown>/70%   1         5         1          54m
+    reverse-proxy        Deployment/reverse-proxy        <unknown>/70%   1         5         1          55m
+    users-microservice   Deployment/users-microservice   <unknown>/70%   1         5         1          55m
+   ```
+
+
+1. To verify that user activity is logged you can run the command `kubectl logs <your pod name>`, in our case
+   it's ` kubectl logs users-microservice-545f6ffbcd-m8r2w`. You should see the following output (to verify the command
+   was executed successfully) in the terminal
+
+   ```shell
+    Executing (default): CREATE TABLE IF NOT EXISTS "User" ("email" VARCHAR(255) , "passwordHash" VARCHAR(255), "createdAt" TIMESTAMP WITH TIME ZONE, "updatedAt" TIMESTAMP WITH TIME ZONE, PRIMARY KEY ("email"));
+    Executing (default): SELECT i.relname AS name, ix.indisprimary AS primary, ix.indisunique AS unique, ix.indkey AS indkey, array_agg(a.attnum) as column_indexes, array_agg(a.attname) AS column_names, pg_get_indexdef(ix.indexrelid) AS definition FROM pg_class t, pg_class i, pg_index ix, pg_attribute a WHERE t.oid = ix.indrelid AND i.oid = ix.indexrelid AND a.attrelid = t.oid AND t.relkind = 'r' and t.relname = 'User' GROUP BY i.relname, ix.indexrelid, ix.indisprimary, ix.indisunique, ix.indkey ORDER BY i.relname;
+    the environment port is 8181
+    server running  on port 8181
+    press CTRL+C to stop server
+    1/10/2021, 12:18:23 AM: 98d02ccf-18ab-4ca2-8874-37ac9da50e16 - attempt to create a new user with email: email@email.com
+    Executing (default): SELECT "email", "passwordHash", "createdAt", "updatedAt" FROM "User" AS "User" WHERE "User"."email" = 'email@email.com';
+    Executing (default): INSERT INTO "User" ("email","passwordHash","createdAt","updatedAt") VALUES ($1,$2,$3,$4) RETURNING *;
+    1/10/2021, 12:18:23 AM: 98d02ccf-18ab-4ca2-8874-37ac9da50e16 - user with email: email@email.com created successfully
+    1/10/2021, 12:26:13 AM: c89889ff-23f3-4ef0-9e7d-f72118a78bb4 - User with email: email@email.com attempt to login
+    Executing (default): SELECT "email", "passwordHash", "createdAt", "updatedAt" FROM "User" AS "User" WHERE "User"."email" = 'email@email.com';
+    1/10/2021, 12:26:14 AM: c89889ff-23f3-4ef0-9e7d-f72118a78bb4 - User with email: email@email.com attempt to login failed
+    1/10/2021, 12:26:29 AM: edfcbf3b-7169-4c33-989f-0375009308d1 - User with email: emcomail@email.com attempt to login
+    Executing (default): SELECT "email", "passwordHash", "createdAt", "updatedAt" FROM "User" AS "User" WHERE "User"."email" = 'emcomail@email.com';
+    1/10/2021, 12:26:29 AM: edfcbf3b-7169-4c33-989f-0375009308d1 - User with email: emcomail@email.com attempt to login failed
+   ```

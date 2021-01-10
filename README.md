@@ -32,8 +32,7 @@
     * [5. Deploying the cluster (pods, containers and services) to EKS using Kubernetes CLI (kubectl)](#deploying-the-cluster-pods-containers-and-services-to-eks-using-kubernetes-cli-kubectl)
     * [6. Get pods and services info from the cluster](#get-pods-and-services-info-from-the-cluster)
     * [7. Configure HPA for each service and Accessing pods logs](#configure-hpa-for-each-service-and-accessing-pods-logs)
-
-* [Useful Links]()
+* [Useful Links](#useful-links)
 
 <!--te-->
 

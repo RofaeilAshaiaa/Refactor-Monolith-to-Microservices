@@ -37,6 +37,8 @@
 
 <!--te-->
 
+![image info](Refactor%20Monolith%20to%20Microservices.png)
+> For a high quality version open the pdf version from [here](Refactor%20Monolith%20to%20Microservices.pdf)
 ## Udagram Application
 
 Udagram is a simple cloud application developed alongside the Udacity AWS Cloud Engineer Nanodegree. It allows users to
